@@ -50,6 +50,10 @@ export interface PaymentInvoice {
   date: string;
   status: 'Pago' | 'Pendente' | 'Vencido';
   category: 'Consulta EMDR' | 'Psicoterapia Geral' | 'Relatório Clínico';
+  invoiceExpressUrl?: string;
+  invoiceExpressId?: string;
+  patientNif?: string;
+  patientEmail?: string;
 }
 
 export interface Message {

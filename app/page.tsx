@@ -55,6 +55,19 @@ export default function Page() {
     modality: 'online' as 'online' | 'presencial'
   });
 
+  // Public website booking state
+  const [webForm, setWebForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    type: 'Trauma EMDR' as 'Trauma EMDR' | 'Consulta Psicoterapia' | 'Avaliação Inicial' | 'Consulta Urgente',
+    date: '2026-05-27',
+    time: '10:30',
+    modality: 'online' as 'online' | 'presencial',
+    message: ''
+  });
+  const [webFormSubmitted, setWebFormSubmitted] = useState(false);
+
   // Clinical configuration form state
   const [workingConfig, setWorkingConfig] = useState({
     workingHoursStart: "09:00",
@@ -123,6 +136,88 @@ export default function Page() {
 
   const handleCancelAppointment = (id: string) => {
     setAppointments(prev => prev.filter(a => a.id !== id));
+  };
+
+  const handleConfirmAppointment = (id: string) => {
+    setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'Confirmada' as const } : a));
+    // Find name and auto-mark notification as read
+    const updated = appointments.find(a => a.id === id);
+    if (updated) {
+      const name = updated.patientName;
+      setNotifications(prev => prev.map(n => n.text.includes(name) ? { ...n, read: true } : n));
+    }
+  };
+
+  const handleWebBookingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Find if the patient exists already
+    const existingPatient = patients.find(
+      p => p.email.toLowerCase() === webForm.email.toLowerCase() || 
+           p.name.toLowerCase() === webForm.name.toLowerCase()
+    );
+    
+    let patientId = '';
+    let finalPatientName = webForm.name;
+    
+    if (!existingPatient) {
+      let treatmentMapped: 'Terapia EMDR' | 'Psicoterapia Integrativa' | 'Gestão de Crise' | 'Apoio em Luto' = 'Terapia EMDR';
+      if (webForm.type === 'Consulta Psicoterapia') {
+        treatmentMapped = 'Psicoterapia Integrativa';
+      } else if (webForm.type === 'Consulta Urgente') {
+        treatmentMapped = 'Gestão de Crise';
+      } else if (webForm.type === 'Avaliação Inicial') {
+        treatmentMapped = 'Terapia EMDR';
+      }
+
+      patientId = `pat_${patients.length + 1}`;
+      const newPat: Patient = {
+        id: patientId,
+        name: webForm.name,
+        email: webForm.email,
+        phone: webForm.phone || '+351 912 345 678',
+        age: 32,
+        treatment: treatmentMapped,
+        status: 'Em Processamento', // Pending evaluation
+        lastSession: 'Não iniciada',
+        nextSession: webForm.date,
+        traumaScoreHistory: [8],
+        sessionsCompleted: 0,
+        unpaidFees: 0,
+        totalPaid: 0,
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${webForm.name}`,
+        clinicalHistory: webForm.message || 'Pedido de consulta via website público.'
+      };
+      setPatients(prev => [newPat, ...prev]);
+    } else {
+      patientId = existingPatient.id;
+      finalPatientName = existingPatient.name;
+      // Update next session on existing patient profile
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, nextSession: webForm.date } : p));
+    }
+
+    const newAppt: Appointment = {
+      id: `app_${appointments.length + 11}`,
+      patientId: patientId,
+      patientName: finalPatientName,
+      date: webForm.date,
+      time: webForm.time,
+      type: webForm.type,
+      status: 'Pendente',
+      modality: webForm.modality,
+      duration: '60 min',
+      price: workingConfig.sessionCost
+    };
+    setAppointments(prev => [...prev, newAppt]);
+
+    const newNotif = {
+      id: `nt_${Date.now()}`,
+      text: `Website: Novo pedido de ${finalPatientName} para ${webForm.date} às ${webForm.time}`,
+      time: "Agora",
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    setWebFormSubmitted(true);
   };
 
   const handleAddInvoice = (invoice: PaymentInvoice) => {
@@ -234,23 +329,16 @@ export default function Page() {
           setCurrentTab(tab);
           setMobileMenuOpen(false);
         }}
-        className={`w-full flex items-center justify-between px-5.5 py-3 rounded-2xl text-left text-xs font-semibold tracking-wider uppercase transition-all duration-300 relative select-none ${
+        className={`w-full flex items-center justify-between px-5 py-3 rounded-xl text-left text-xs font-semibold tracking-wide transition-all duration-300 relative select-none ${
           active 
-            ? 'bg-[#d4e7d8]/20 text-[#d4e7d8] border border-[#d4e7d8]/10' 
-            : 'text-[#8a9a8f] hover:text-[#faf9f6] hover:bg-[#d4e7d8]/5'
+            ? 'bg-brand-50 text-brand-900' 
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
         }`}
       >
         <span className="flex items-center gap-3">
           {icon}
           <span>{label}</span>
         </span>
-        {active && (
-          <motion.span 
-            layoutId="sidebarActivePill" 
-            className="w-1.5 h-1.5 rounded-full bg-[#d4e7d8]" 
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-          />
-        )}
       </button>
     );
   };
@@ -292,31 +380,31 @@ export default function Page() {
         <div className="flex flex-1 relative items-stretch">
           
           {/* SIDEBAR NAVIGATION - LUXURY OLIVE THEME */}
-          <aside className={`fixed inset-y-0 left-0 bg-[#232d26] w-[270px] z-50 p-6 flex flex-col justify-between border-r border-[#4f6054]/10 transform transition-transform duration-500 xl:translate-x-0 ${
+          <aside className={`fixed inset-y-0 left-0 bg-white w-[270px] z-50 flex flex-col justify-between border-r border-slate-200 transform transition-transform duration-500 xl:translate-x-0 ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}>
-            <div className="space-y-6 flex flex-col flex-1 h-full">
+            <div className="space-y-2 flex flex-col flex-1 h-full">
               {/* Sidebar Logo */}
-              <div className="flex justify-between items-center pb-5 border-b border-[#8a9a8f]/10">
+              <div className="h-[74px] flex items-center justify-between px-6 border-b border-slate-200 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#4f6054]/30 border border-[#8a9a8f]/10 flex items-center justify-center text-white font-serif italic text-lg shadow-sm">
+                  <div className="w-8 h-8 rounded-lg bg-brand-900 flex items-center justify-center text-white font-serif italic text-lg shadow-sm">
                     Ψ
                   </div>
                   <div className="text-left space-y-0.5">
-                    <h2 className="font-serif text-sm md:text-base tracking-tight font-light text-[#faf9f6]">Carolina Amores</h2>
-                    <span className="text-[9px] uppercase tracking-widest block font-bold text-[#8a9a8f]">Portal de Saúde Mental</span>
+                    <h2 className="font-bold text-sm text-slate-900">Clinical Management</h2>
+                    <span className="text-[9px] uppercase tracking-widest block font-bold text-slate-500">Saúde Mental</span>
                   </div>
                 </div>
                 <button 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="xl:hidden p-2 hover:bg-white/5 rounded-full text-[#8a9a8f]"
+                  className="xl:hidden p-2 hover:bg-slate-50 rounded-full text-slate-400"
                 >
                   <X size={16} />
                 </button>
               </div>
 
               {/* Sidebar Links */}
-              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1.5 scrollbar-thin">
+              <div className="flex-1 overflow-y-auto space-y-1.5 px-4 pt-4 scrollbar-thin">
                 {renderSidebarItem("dashboard", "Painel Geral", <LayoutDashboard size={14} />)}
                 {renderSidebarItem("agenda", "Calendário", <Calendar size={14} />)}
                 {renderSidebarItem("pacientes", "Pacientes", <Users size={14} />)}
@@ -326,15 +414,15 @@ export default function Page() {
             </div>
 
             {/* Bottom Credit Profile Card */}
-            <div className="pt-4 border-t border-[#8a9a8f]/10 flex gap-3 text-left hover:bg-white/5 p-2 rounded-2xl transition-all select-none">
+            <div className="p-4 border-t border-slate-200 bg-slate-50/50 m-2 rounded-xl mb-4 text-left flex gap-3 transition-all select-none">
               <img
                 src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"
                 alt="Psicóloga"
-                className="w-10 h-10 rounded-xl object-cover border border-[#8a9a8f]/20"
+                className="w-10 h-10 rounded-xl object-cover border border-slate-200"
               />
               <div className="space-y-0.5 flex-1 min-w-0">
-                <h4 className="text-xs font-bold text-[#faf9f6] truncate">Dra. Carolina Amores</h4>
-                <p className="text-[9px] text-[#8a9a8f]/80 truncate font-semibold">Cédula OPP 24523 • Ativa</p>
+                <h4 className="text-xs font-bold text-slate-900 truncate">Dra. Carolina Amores</h4>
+                <p className="text-[9px] text-brand-600 truncate font-bold uppercase tracking-wider">Conta SaaS Ativa</p>
               </div>
             </div>
           </aside>
@@ -343,19 +431,19 @@ export default function Page() {
           <main className="flex-1 flex flex-col min-w-0 xl:pl-[270px]">
             
             {/* TOP BAR BRAND WIDGETS */}
-            <header className="h-[74px] bg-white border-b border-[#e6e2d7]/50 px-6 sm:px-8 flex justify-between items-center shrink-0">
+            <header className="h-[74px] bg-white border-b border-slate-200 px-6 sm:px-8 flex justify-between items-center shrink-0">
               {/* Left Action: Search Input or Mobile Trigger */}
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setMobileMenuOpen(true)}
-                  className="xl:hidden p-2 hover:bg-[#faf9f6] rounded-full text-[#191c1d]"
+                  className="xl:hidden p-2 hover:bg-slate-50 rounded-full text-slate-600"
                 >
                   <Menu size={18} />
                 </button>
                 
                 {/* Dynamically filters patients if focused and typing */}
                 <div className="hidden sm:flex relative items-center w-[280px]">
-                  <Search size={14} className="absolute left-3.5 text-[#4a504b]/60" />
+                  <Search size={14} className="absolute left-3.5 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Efetuar busca rápida..."
@@ -363,7 +451,7 @@ export default function Page() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
-                    className="w-full bg-[#faf9f6] border border-[#e6e2d7]/80 rounded-full pl-9 pr-4 py-2 text-xs focus:ring-1 focus:ring-[#4f6054] focus:outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-full pl-9 pr-4 py-2 text-xs focus:ring-1 focus:ring-brand-500 focus:outline-none placeholder-slate-400"
                   />
                   
                   {/* Real Search Dropdown Popup Results */}
@@ -373,9 +461,9 @@ export default function Page() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute left-0 right-0 top-11 bg-white border border-[#e6e2d7] rounded-2xl shadow-xl p-3 z-50 text-left max-h-[220px] overflow-y-auto"
+                        className="absolute left-0 right-0 top-11 bg-white border border-slate-200 rounded-2xl shadow-lg p-3 z-50 text-left max-h-[220px] overflow-y-auto"
                       >
-                        <span className="text-[9px] font-bold text-[#4a504b] uppercase tracking-wide block mb-2 px-1">Resultados da busca:</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block mb-2 px-1">Resultados da busca:</span>
                         {patients.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).map(p => (
                           <button
                             key={p.id}
@@ -383,9 +471,9 @@ export default function Page() {
                               setCurrentTab('pacientes');
                               setSearchQuery('');
                             }}
-                            className="w-full flex items-center gap-2 py-1.5 px-2 hover:bg-[#faf9f6] rounded-lg text-xs font-semibold text-[#191c1d]"
+                            className="w-full flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 rounded-lg text-xs font-semibold text-slate-700"
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#4f6054]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                             <span>{p.name}</span>
                           </button>
                         ))}
@@ -401,7 +489,7 @@ export default function Page() {
                 {/* Trigger Nova Consulta */}
                 <button
                   onClick={() => setQuickBookingOpen(true)}
-                  className="hidden md:flex items-center gap-1.5 bg-[#4f6054]/10 text-[#4f6054] px-4.5 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-[#4f6054]/15 hover:bg-[#4f6054] hover:text-white transition-all cursor-pointer"
+                  className="hidden md:flex items-center gap-1.5 bg-brand-50 text-brand-900 border border-brand-100 px-4.5 py-2 rounded-full text-xs font-bold uppercase tracking-wider hover:bg-brand-900 hover:text-white transition-all cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Nova Consulta</span>
@@ -411,7 +499,7 @@ export default function Page() {
                 <div className="relative">
                   <button 
                     onClick={() => setNotificationsOpen(!notificationsOpen)}
-                    className="p-2.5 bg-[#faf9f6]/80 hover:bg-[#faf9f6] border border-[#e6e2d7] rounded-full text-[#4a504b] transition-all relative"
+                    className="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-slate-600 transition-all relative"
                   >
                     <Bell size={15} />
                     {notifications.some(n => !n.read) && (
@@ -425,25 +513,25 @@ export default function Page() {
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                        className="absolute right-0 top-11 bg-white border border-[#e6e2d7] rounded-2xl shadow-xl w-[320px] p-4.5 z-55 text-left"
+                        className="absolute right-0 top-11 bg-white border border-slate-200 rounded-2xl shadow-xl w-[320px] p-4.5 z-55 text-left"
                       >
-                        <div className="flex justify-between items-center border-b border-[#e6e2d7]/50 pb-2.5 mb-2.5">
-                          <span className="text-xs font-bold text-[#191c1d] uppercase tracking-wide">Notificações Clínicas</span>
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2.5 mb-2.5">
+                          <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">Notificações Clínicas</span>
                           <button 
                             onClick={() => {
                               setNotifications(prev => prev.map(n => ({ ...n, read: true })));
                               setNotificationsOpen(false);
                             }}
-                            className="text-[10px] text-[#4f6054] font-bold hover:underline"
+                            className="text-[10px] text-brand-600 font-bold hover:underline"
                           >
                             Lidas
                           </button>
                         </div>
                         <div className="space-y-3 max-h-[220px] overflow-y-auto">
                           {notifications.map(n => (
-                            <div key={n.id} className="text-xs border-b border-[#e6e2d7]/20 pb-2 space-y-0.5">
-                              <p className="text-[#191c1d] font-semibold tracking-tight">{n.text}</p>
-                              <span className="text-[9px] text-[#4a504b]/60 block">{n.time}</span>
+                            <div key={n.id} className="text-xs border-b border-slate-50 pb-2 space-y-0.5">
+                              <p className="text-slate-800 font-semibold tracking-tight">{n.text}</p>
+                              <span className="text-[9px] text-slate-500 block">{n.time}</span>
                             </div>
                           ))}
                         </div>
@@ -453,17 +541,17 @@ export default function Page() {
                 </div>
 
                 {/* Quick Doctor visual Status wrapper */}
-                <div className="flex items-center gap-3 border-l border-[#e6e2d7]/80 pl-4.5">
+                <div className="flex items-center gap-3 border-l border-slate-200 pl-4.5">
                   <div className="relative shrink-0 select-none">
                     <img 
                       src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=120"
                       alt="Dra. Carolina Amores" 
-                      className="w-9 h-9 rounded-full object-cover border border-[#e6e2d7]"
+                      className="w-9 h-9 rounded-full object-cover border border-slate-200"
                     />
                     <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white" />
                   </div>
                   <div className="text-left hidden lg:block leading-none">
-                    <h5 className="text-xs font-bold text-[#191c1d]">Dra. Carolina</h5>
+                    <h5 className="text-xs font-bold text-slate-900">Dra. Carolina</h5>
                     <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider block mt-1">Disponível</span>
                   </div>
                 </div>
@@ -488,6 +576,8 @@ export default function Page() {
                       appointments={appointments} 
                       onNavigate={(tab) => setCurrentTab(tab)} 
                       onQuickBooking={() => setQuickBookingOpen(true)}
+                      onConfirmAppointment={handleConfirmAppointment}
+                      onCancelAppointment={handleCancelAppointment}
                     />
                   )}
 
@@ -497,6 +587,7 @@ export default function Page() {
                       patients={patients} 
                       onAddAppointment={handleAddAppointment}
                       onCancelAppointment={handleCancelAppointment}
+                      onConfirmAppointment={handleConfirmAppointment}
                     />
                   )}
 
@@ -847,39 +938,164 @@ export default function Page() {
 
             <div className="lg:col-span-7 bg-white p-6 sm:p-8 border border-[#e6e2d7] rounded-3xl shadow-sm">
               <h3 className="font-serif text-lg text-[#191c1d] mb-4">Pedido de Consulta</h3>
-              <form onSubmit={(e) => { e.preventDefault(); alert("Mensagem enviada com sucesso! Dra. Carolina entrará em contacto dentro de 24 horas."); }} className="space-y-4 text-xs font-medium">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-[#4a504b]">Nome Completo</label>
-                    <input type="text" required placeholder="Ex: Maria Pereira" className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-[#4a504b]">E-mail</label>
-                    <input type="email" required placeholder="maria.pereira@email.com" className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[#4a504b]">Motivo ou Especialidade Pretendida</label>
-                  <select className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none">
-                    <option>Sessão de EMDR (Trauma, Crise, Luto)</option>
-                    <option>Psicoterapia Sistémica Integrada</option>
-                    <option>Primeira Consulta de Avaliação Clínica</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-[#4a504b]">Mensagem Adicional</label>
-                  <textarea rows={3} placeholder="Escreva brevemente o que o motiva a procurar apoio..." className="w-full bg-[#faf9f6] border border-[#e6e2d7] p-4 rounded-xl focus:outline-none resize-none" />
-                </div>
-
-                <button 
-                  type="submit" 
-                  className="w-full bg-[#4f6054] hover:bg-[#232d26] text-white text-xs font-bold uppercase tracking-wider py-3.5 rounded-full transition-all shadow-md mt-2"
+              
+              {webFormSubmitted ? (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-[#faf9f6] border border-[#d4e7d8] rounded-2xl p-6 text-center space-y-4"
                 >
-                  Solicitar Agendamento
-                </button>
-              </form>
+                  <div className="w-12 h-12 rounded-full bg-[#d4e7d8] flex items-center justify-center text-[#4f6054] mx-auto">
+                    <Check className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif text-base text-[#191c1d]">Pedido Recebido com Sucesso!</h4>
+                    <p className="text-xs text-[#4a504b] leading-relaxed max-w-md mx-auto">
+                      O seu pedido de consulta foi encaminhado diretamente para o portal de gestão clínica da Dra. Carolina Amores. Entraremos em contacto muito em breve para confirmar o seu horário.
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-[#e6e2d7] text-left text-xs space-y-1 max-w-xs mx-auto">
+                    <p><strong>Paciente:</strong> {webForm.name}</p>
+                    <p><strong>E-mail:</strong> {webForm.email}</p>
+                    <p><strong>Data Proposta:</strong> {webForm.date} às {webForm.time}</p>
+                    <p><strong>Formato:</strong> {webForm.modality === 'online' ? 'Videoconsulta (Online)' : 'Presencial (Gabinete)'}</p>
+                    <p><strong>Especialidade:</strong> {webForm.type}</p>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setWebForm({
+                        name: '',
+                        email: '',
+                        phone: '',
+                        type: 'Trauma EMDR',
+                        date: '2026-05-27',
+                        time: '10:30',
+                        modality: 'online',
+                        message: ''
+                      });
+                      setWebFormSubmitted(false);
+                    }}
+                    className="bg-[#4f6054] hover:bg-[#232d26] text-white px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all"
+                  >
+                    Solicitar Mais Um Agendamento
+                  </button>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleWebBookingSubmit} className="space-y-4 text-xs font-medium">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Nome Completo</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={webForm.name}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ex: Maria Pereira" 
+                        className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">E-mail</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={webForm.email}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="maria.pereira@email.com" 
+                        className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Telemóvel / Telefone</label>
+                      <input 
+                        type="tel" 
+                        value={webForm.phone}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, phone: e.target.value }))}
+                        placeholder="Ex: +351 912 345 678" 
+                        className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" 
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Motivo ou Especialidade Pretendida</label>
+                      <select 
+                        value={webForm.type}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, type: e.target.value as any }))}
+                        className="w-full bg-[#faf9f6]/95 border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none"
+                      >
+                        <option value="Trauma EMDR">Sessão de EMDR (Trauma, Crise, Luto)</option>
+                        <option value="Consulta Psicoterapia">Psicoterapia Sistémica Integrada</option>
+                        <option value="Avaliação Inicial">Primeira Consulta de Avaliação Clínica</option>
+                        <option value="Consulta Urgente">Consulta em Crise Aguda / Urgente</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1 col-span-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Data Desejada</label>
+                      <input 
+                        type="date" 
+                        required 
+                        value={webForm.date}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, date: e.target.value }))}
+                        className="w-full bg-[#faf9f6] border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none" 
+                      />
+                    </div>
+                    <div className="space-y-1 col-span-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Hora Desejada</label>
+                      <select 
+                        value={webForm.time}
+                        onChange={(e) => setWebForm(prev => ({ ...prev, time: e.target.value }))}
+                        className="w-full bg-[#faf9f6]/95 border border-[#e6e2d7] px-4 py-2.5 rounded-xl focus:outline-none"
+                      >
+                        {["09:00", "10:30", "12:00", "14:00", "15:30", "17:00", "18:30"].map((h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1 col-span-1">
+                      <label className="text-[10px] uppercase font-bold text-[#4a504b]">Formato da Sessão</label>
+                      <div className="flex bg-[#faf9f6] border border-[#e6e2d7] rounded-xl p-1">
+                        {(['online', 'presencial'] as const).map((m) => (
+                          <button
+                            type="button"
+                            key={m}
+                            onClick={() => setWebForm(prev => ({ ...prev, modality: m }))}
+                            className={`flex-1 py-1 px-1.5 text-[9px] uppercase font-bold rounded-lg transition-all ${
+                              webForm.modality === m ? 'bg-[#4f6054] text-white shadow-2xs' : 'text-[#4a504b] hover:text-[#191c1d]'
+                            }`}
+                          >
+                            {m === 'online' ? 'Online' : 'Gabinete'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-[#4a504b]">Mensagem Adicional (Opcional)</label>
+                    <textarea 
+                      rows={2} 
+                      value={webForm.message}
+                      onChange={(e) => setWebForm(prev => ({ ...prev, message: e.target.value }))}
+                      placeholder="Escreva brevemente o que o motiva a procurar apoio..." 
+                      className="w-full bg-[#faf9f6] border border-[#e6e2d7] p-4 rounded-xl focus:outline-none resize-none" 
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="w-full bg-[#4f6054] hover:bg-[#232d26] text-white text-xs font-bold uppercase tracking-wider py-3.5 rounded-full transition-all shadow-md mt-2"
+                  >
+                    Solicitar Agendamento Clínico
+                  </button>
+                </form>
+              )}
             </div>
           </section>
 

@@ -10,6 +10,7 @@ interface AgendaViewProps {
   patients: Patient[];
   onAddAppointment: (appointment: Omit<Appointment, 'id'>) => void;
   onCancelAppointment: (id: string) => void;
+  onConfirmAppointment: (id: string) => void;
 }
 
 const HOURS = ["09:00", "10:30", "12:00", "14:00", "15:30", "17:00", "18:30"];
@@ -21,7 +22,7 @@ const DAYS = [
   { label: "Sexta", date: "29 Mai", full: "2026-05-29" }
 ];
 
-export default function AgendaView({ appointments, patients, onAddAppointment, onCancelAppointment }: AgendaViewProps) {
+export default function AgendaView({ appointments, patients, onAddAppointment, onCancelAppointment, onConfirmAppointment }: AgendaViewProps) {
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
   const [selectedDate, setSelectedDate] = useState("2026-05-26"); // Terça by default
   const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
@@ -55,7 +56,10 @@ export default function AgendaView({ appointments, patients, onAddAppointment, o
     setIsNewBookingOpen(false);
   };
 
-  const getEventClass = (type: Appointment['type']) => {
+  const getEventClass = (type: Appointment['type'], status: Appointment['status']) => {
+    if (status === 'Pendente') {
+      return 'bg-amber-50/90 border-l-[3.5px] border-amber-400 text-amber-950 border-dashed border-r border-t border-b border-amber-200';
+    }
     switch (type) {
       case 'Trauma EMDR': return 'bg-[#4f6054]/10 border-l-[3.5px] border-[#4f6054] text-[#191c1d]';
       case 'Consulta Psicoterapia': return 'bg-[#605e56]/10 border-l-[3.5px] border-[#605e56] text-[#191c1d]';
@@ -173,7 +177,7 @@ export default function AgendaView({ appointments, patients, onAddAppointment, o
                       className="col-span-2 p-1.5 border-r border-[#e6e2d7]/10 flex items-stretch h-full overflow-hidden select-none"
                     >
                       {event ? (
-                        <div className={`w-full p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all ${getEventClass(event.type)}`}>
+                        <div className={`w-full p-2.5 rounded-2xl border text-left flex flex-col justify-between transition-all ${getEventClass(event.type, event.status)}`}>
                           <div className="space-y-0.5">
                             <div className="flex justify-between items-start gap-1">
                               <h4 className="text-[11px] font-bold leading-tight line-clamp-1">{event.patientName}</h4>
@@ -181,18 +185,37 @@ export default function AgendaView({ appointments, patients, onAddAppointment, o
                                 {event.modality === 'online' ? "ON" : "PRES"}
                               </span>
                             </div>
-                            <p className="text-[9px] opacity-75 font-medium line-clamp-1">{event.type}</p>
+                            <p className="text-[9px] opacity-75 font-medium line-clamp-1">
+                              {event.status === 'Pendente' ? "⚠️ Pendente Website" : event.type}
+                            </p>
                           </div>
 
-                          <div className="flex justify-between items-center shrink-0 pt-1 border-t border-[#191c1d]/5 mt-1.5">
-                            <span className="text-[10px] font-bold">€{event.price}</span>
-                            <button 
-                              onClick={() => onCancelAppointment(event.id)}
-                              className="text-[9px] text-red-700 font-semibold hover:underline bg-white/20 px-1.5 py-0.5 rounded"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
+                          {event.status === 'Pendente' ? (
+                            <div className="flex gap-1.5 pt-1 mt-1 border-t border-amber-200">
+                              <button 
+                                onClick={() => onConfirmAppointment(event.id)}
+                                className="text-[8px] bg-[#4f6054] text-white font-bold px-1.5 py-0.5 rounded transition-colors"
+                              >
+                                Aprovar
+                              </button>
+                              <button 
+                                onClick={() => onCancelAppointment(event.id)}
+                                className="text-[8px] bg-rose-50 text-rose-700 font-bold px-1.5 py-0.5 rounded transition-colors border border-rose-200"
+                              >
+                                Recusar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between items-center shrink-0 pt-1 border-t border-[#191c1d]/5 mt-1.5">
+                              <span className="text-[10px] font-bold">€{event.price}</span>
+                              <button 
+                                onClick={() => onCancelAppointment(event.id)}
+                                className="text-[9px] text-red-700 font-semibold hover:underline bg-white/20 px-1.5 py-0.5 rounded"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <button
@@ -231,26 +254,47 @@ export default function AgendaView({ appointments, patients, onAddAppointment, o
                 <div key={idx} className="flex gap-4 items-center">
                   <span className="font-mono text-xs text-[#4a504b] w-14 shrink-0">{hour}</span>
                   {event ? (
-                    <div className={`flex-1 p-4 rounded-2xl border flex items-center justify-between text-left ${getEventClass(event.type)}`}>
+                    <div className={`flex-1 p-4 rounded-2xl border flex items-center justify-between text-left ${getEventClass(event.type, event.status)}`}>
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-[#4f6054]/20 flex items-center justify-center text-[#4f6054]">
                           <Users size={16} />
                         </div>
                         <div>
                           <h4 className="font-semibold text-xs py-0.5 text-[#191c1d]">{event.patientName}</h4>
-                          <span className="text-[10px] text-[#4a504b]/90">{event.type} • {event.duration} • €{event.price}</span>
+                          <span className="text-[10px] text-[#4a504b]/90">
+                            {event.status === 'Pendente' ? "⚠️ Pendente do Website" : event.type} • {event.duration} • €{event.price}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-full uppercase font-mono tracking-wider font-semibold">
-                          Confirmada
-                        </span>
-                        <button 
-                          onClick={() => onCancelAppointment(event.id)}
-                          className="text-[10px] text-red-700 font-semibold hover:underline"
-                        >
-                          Cancelar
-                        </button>
+                      <div className="flex gap-2 items-center">
+                        {event.status === 'Pendente' ? (
+                          <>
+                            <button 
+                              onClick={() => onConfirmAppointment(event.id)}
+                              className="text-[10px] bg-[#4f6054] hover:bg-[#232d26] text-white font-bold px-3 py-1.5 rounded-full transition-colors"
+                            >
+                              Confirmar Pedido
+                            </button>
+                            <button 
+                              onClick={() => onCancelAppointment(event.id)}
+                              className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold px-3 py-1.5 rounded-full transition-colors"
+                            >
+                              Recusar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded-full uppercase font-mono tracking-wider font-semibold">
+                              Confirmada
+                            </span>
+                            <button 
+                              onClick={() => onCancelAppointment(event.id)}
+                              className="text-[10px] text-red-700 font-semibold hover:underline"
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ) : (

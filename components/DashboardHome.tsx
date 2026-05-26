@@ -13,19 +13,29 @@ interface DashboardHomeProps {
   appointments: Appointment[];
   onNavigate: (tab: string) => void;
   onQuickBooking: () => void;
+  onConfirmAppointment?: (id: string) => void;
+  onCancelAppointment?: (id: string) => void;
 }
 
-export default function DashboardHome({ patients, appointments, onNavigate, onQuickBooking }: DashboardHomeProps) {
+export default function DashboardHome({ 
+  patients, 
+  appointments, 
+  onNavigate, 
+  onQuickBooking,
+  onConfirmAppointment,
+  onCancelAppointment
+}: DashboardHomeProps) {
   
   // Calculate stats
   const activeCount = patients.filter(p => p.status !== 'Alta Recente').length;
   const todayApps = appointments.filter(app => app.date === "2026-05-26");
   const totalRevenue = patients.reduce((acc, curr) => acc + curr.totalPaid, 0);
+  const pendingApps = appointments.filter(app => app.status === 'Pendente');
 
   return (
     <div className="flex flex-col gap-8 text-left h-full">
       {/* WELCOME BAR */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-[#e6e2d7]/50 shadow-xs">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:sm:sm:center gap-4 bg-white p-6 rounded-3xl border border-[#e6e2d7]/50 shadow-xs">
         <div>
           <span className="text-[#4f6054] text-xs font-semibold uppercase tracking-widest block mb-1">Bem-vinda de volta</span>
           <h1 className="font-serif text-2xl md:text-3xl font-light text-[#191c1d]">Portal Dra. Carolina Amores</h1>
@@ -112,6 +122,61 @@ export default function DashboardHome({ patients, appointments, onNavigate, onQu
         </div>
 
       </div>
+
+      {/* PENDING APPOINTMENTS SECTION (WEBSITE FORWARDING) */}
+      {pendingApps.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-50/75 border border-amber-200 rounded-[2rem] p-6 shadow-xs text-left"
+        >
+          <div className="flex justify-between items-center border-b border-amber-200/50 pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <h3 className="font-serif text-lg font-medium text-[#191c1d]">Novos Pedidos do Website Público</h3>
+            </div>
+            <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
+              {pendingApps.length} Pendentes de Aprovação
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {pendingApps.map((appt) => (
+              <div key={appt.id} className="bg-white p-5 rounded-2xl border border-amber-200/60 flex flex-col justify-between gap-4 shadow-3xs hover:border-amber-400/50 transition-colors">
+                <div className="text-left space-y-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="text-xs font-bold text-[#191c1d] line-clamp-1">{appt.patientName}</h4>
+                    <span className="text-[9px] bg-[#d4e7d8] text-[#4f6054] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold">
+                      {appt.modality}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#4a504b]">
+                    Data: <strong className="text-[#191c1d]">{appt.date}</strong> às <strong className="text-[#191c1d]">{appt.time}</strong>
+                  </p>
+                  <p className="text-[10px] text-[#4a504b]/90 line-clamp-1">
+                    Especialidade: <span className="font-semibold text-[#191c1d]/90">{appt.type}</span>
+                  </p>
+                </div>
+
+                <div className="flex gap-2.5 border-t border-gray-100 pt-3">
+                  <button
+                    onClick={() => onConfirmAppointment?.(appt.id)}
+                    className="flex-1 bg-[#4f6054] hover:bg-[#232d26] text-white text-[10px] font-bold py-2.5 rounded-full transition-all cursor-pointer shadow-sm"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    onClick={() => onCancelAppointment?.(appt.id)}
+                    className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/55 text-[10px] font-semibold py-2.5 rounded-full transition-all cursor-pointer"
+                  >
+                    Rejeitar / Cancelar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* DETAILED DOUBLE GRID FOR INTERACTIVE SCHEDULE & ACTIVITY */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

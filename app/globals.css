@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-serif), Georgia, serif;
+  
+  --color-brand-primary: #4f6054;
+  --color-brand-dark: #232d26;
+  --color-brand-light: #67796c;
+  --color-brand-fixed: #d4e7d8;
+  --color-brand-secondary: #605e56;
+  --color-brand-cream: #faf9f6;
+  --color-brand-bege: #e6e2d7;
+  --color-brand-sand: #f0ede6;
+  --color-brand-charcoal: #191c1d;
+  --color-brand-text-muted: #4a504b;
+  --color-brand-sage-muted: #8a9a8f;
+}
+
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0px 10px 40px rgba(74, 85, 104, 0.04);
+}
+
+@utility glass-nav {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+@utility scroll-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.8s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+@utility scroll-reveal-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+

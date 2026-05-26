@@ -1,0 +1,6 @@
+{
+  "name": "Carolina Amores - Psicologia e EMDR",
+  "description": "Landing page premium de psicologia clínica e terapia EMDR com estética moderna e minimalista.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
